@@ -1,0 +1,508 @@
+##########
+# AWTRIX NG - List Calendar
+# Created by Smart Home Junkie with help from Patrick Kolmann
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG List Calendar
+  description: >-
+    Shows all upcoming calendar entries as a pushed app on one or more AWTRIX NG
+    displays, and optionally sends a notification 15 minutes before an event starts.
+    Built for the AWTRIX NG MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/apps/pushed/<app name>.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the App on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    my_calendar:
+      name: Calendar
+      description: >-
+        Select the calendar you want to show on the clock. The app value changes when
+        the calendar changes.
+      selector:
+        entity:
+          filter:
+            - domain: calendar
+    hours_ahead:
+      name: Hours ahead
+      description: How many hours in advance should agenda items be shown? (default 24).
+      default: "24"
+    show_timeline:
+      name: Show Timeline?
+      description: Do you want to cycle the whole timeline for the upcoming hours?
+      selector:
+        boolean:
+      default: true
+    show_whole_day_events:
+      name: Show Whole Day Events?
+      description: Do you want to show events that last the whole day?
+      selector:
+        boolean:
+      default: true
+    show_alerts:
+      name: Show Alerts?
+      description: Do you want a notification when the calendar event starts?
+      selector:
+        boolean:
+      default: true
+    play_alert_tone:
+      name: Play Alert Tone
+      description: Should an alert tone be played 15 minutes before the event starts?
+      selector:
+        boolean:
+      default: false
+    sound_name:
+      name: Sound File / Track
+      description: >-
+        Buzzer: the name of a melody in /MELODIES (without .txt). DFPlayer: the track
+        number. Leave empty to play the RTTTL melody below. Only used when "Play Alert
+        Tone" is on.
+      selector:
+        text:
+      default: ""
+    sound_rtttl:
+      name: Alert Melody (RTTTL)
+      description: Melody played when "Play Alert Tone" is on and no sound file is set.
+      selector:
+        text:
+      default: "alert:d=4,o=5,b=180:8c6,8p,8c6,8p,8c6"
+    stack:
+      name: Stack Notification?
+      description: >-
+        Defines if the notification will be stacked. "Off" will immediately replace
+        the current notification.
+      selector:
+        boolean:
+      default: true
+    my_icon:
+      name: Icon
+      description: Enter the Icon Name or ID of the icon that you like to show.
+      selector:
+        text:
+      default: ""
+    icon_mode:
+      name: Push Icon
+      description: Icon behavior.
+      selector:
+        select:
+          options:
+            - label: "Icon doesn't move"
+              value: "fixed"
+            - label: "Icon moves with text and will not appear again"
+              value: "pushOnce"
+            - label: "Icon moves with text but appears again when the text starts"
+              value: "push"
+          mode: dropdown
+      default: "push"
+    my_text:
+      name: Custom Text
+      description: Text to show when there are no upcoming calendar events.
+      selector:
+        text:
+      default: "Yay! You have no appointments!"
+    show_empty_calendar:
+      name: Show Empty Calendar
+      description: >-
+        Show the custom text when there are no events. If set to false, the calendar
+        will not show when there are no events after the lifetime has ended.
+      selector:
+        boolean:
+      default: true
+    prefix:
+      name: Prefix
+      description: >-
+        Enter an optional prefix text, for instance the calendar name when you use
+        multiple calendars.
+      selector:
+        text:
+      default: ""
+    today_text:
+      name: Today Text
+      description: Text to show for events that occur today.
+      selector:
+        text:
+      default: ""
+    tomorrow_text:
+      name: Tomorrow Text
+      description: Text to show for events that occur tomorrow.
+      selector:
+        text:
+      default: ""
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+            - label: "Use global setting"
+              value: "inherit"
+            - label: "Force Uppercase"
+              value: "upper"
+            - label: "Show as you entered it"
+              value: "asTyped"
+          mode: dropdown
+      default: "inherit"
+    background_color:
+      name: Background Color
+      description: Select the Background color.
+      selector:
+        color_rgb:
+      default: [0, 0, 0]
+    text_color:
+      name: Text Color
+      description: Select the Text color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    show_rainbow:
+      name: Rainbow Colors
+      description: Should the text be shown in Rainbow colors?
+      selector:
+        boolean:
+      default: false
+    repeat:
+      name: Repeat
+      description: >-
+        How many times the text is scrolled through the matrix before the app ends.
+        0 turns it off and the duration is used instead.
+      default: "0"
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      default: "0"
+    lifetime:
+      name: Lifetime (in seconds)
+      description: >-
+        How long the app stays alive before it is removed from the app cycle
+        automatically. 0 is infinite lifetime.
+      default: "0"
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: >-
+        What happens when the lifetime runs out. "Remove" drops the app from the
+        rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+            - label: "Remove the app"
+              value: "remove"
+            - label: "Mark the app as stale"
+              value: "mark"
+          mode: dropdown
+      default: "remove"
+    switch_to_app:
+      name: Switch to app on value change
+      description: >-
+        Should the clock switch to the app immediately when the calendar changes?
+        BEWARE! This can flood your clock with MQTT messages.
+      selector:
+        boolean:
+      default: false
+    scroll:
+      name: Scroll the text?
+      description: Enables text scrolling.
+      selector:
+        boolean:
+      default: true
+    scrollspeed:
+      name: Scroll Speed Percentage
+      description: Modifies the scrollspeed. You need to enter a percentage value.
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 200
+      default: 100
+    effect:
+      name: Effect
+      description: Select a background effect (optional).
+      selector:
+        select:
+          options:
+            - label: "None"
+              value: ""
+            - label: "BrickBreaker"
+              value: "BrickBreaker"
+            - label: "Checkerboard"
+              value: "Checkerboard"
+            - label: "ColorWaves"
+              value: "ColorWaves"
+            - label: "Fade"
+              value: "Fade"
+            - label: "Fireworks"
+              value: "Fireworks"
+            - label: "LookingEyes"
+              value: "LookingEyes"
+            - label: "Matrix"
+              value: "Matrix"
+            - label: "MovingLine"
+              value: "MovingLine"
+            - label: "PingPong"
+              value: "PingPong"
+            - label: "Pacifica"
+              value: "Pacifica"
+            - label: "Plasma"
+              value: "Plasma"
+            - label: "PlasmaCloud"
+              value: "PlasmaCloud"
+            - label: "Radar"
+              value: "Radar"
+            - label: "Ripple"
+              value: "Ripple"
+            - label: "Snake"
+              value: "Snake"
+            - label: "SwirlIn"
+              value: "SwirlIn"
+            - label: "SwirlOut"
+              value: "SwirlOut"
+            - label: "TheaterChase"
+              value: "TheaterChase"
+            - label: "TwinklingStars"
+              value: "TwinklingStars"
+          mode: dropdown
+      default: ""
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+  - trigger: time_pattern
+    minutes: "/1"
+    id: "Changes"
+  - trigger: calendar
+    event: start
+    offset: "-0:15:0"
+    entity_id: !input my_calendar
+    id: "Calendar_Event_Trigger"
+
+# offset should be variable in the future. This is not possible to create in blueprints atm
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  my_calendar: !input my_calendar
+  my_icon: !input my_icon
+  icon_mode: !input icon_mode
+  my_hours_ahead: !input hours_ahead
+  my_show_timeline: !input show_timeline
+  my_show_whole_day_events: !input show_whole_day_events
+  my_show_alerts: !input show_alerts
+  play_alert_tone: !input play_alert_tone
+  sound_name: !input sound_name
+  sound_rtttl: !input sound_rtttl
+  stack: !input stack
+  background_color: !input background_color
+  text_color: !input text_color
+  text_case: !input text_case
+  show_rainbow: !input show_rainbow
+  my_repeat: !input repeat
+  my_duration: !input duration
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  my_text: !input my_text
+  my_today: !input today_text
+  my_tomorrow: !input tomorrow_text
+  my_prefix: !input prefix
+  my_show_empty_calendar: !input show_empty_calendar
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # AWTRIX NG app names must match [A-Za-z0-9_-]{1,32}, so the entity id is sanitised.
+  app_name: >-
+    {{ (my_calendar | trim | regex_replace('[^A-Za-z0-9_-]', '_'))[:32] }}
+  scroll_obj: >-
+    {{ {"mode": "static"} if not scrolling else {"speed": scroll_speed | int(100)} }}
+
+actions:
+  - action: calendar.get_events
+    data:
+      start_date_time: "{{ now() }}"
+      end_date_time: "{{ now() + timedelta(hours=my_hours_ahead | int) }}"
+    target:
+      entity_id: !input my_calendar
+    response_variable: agenda
+  - variables:
+      agenda_text: >-
+        {% if my_prefix != '' %}{{ my_prefix }}{% endif %}{% set ns = namespace(today_prefix_shown = false, tomorrow_prefix_shown = false, today_events_exist = false) %}{% if agenda[my_calendar] is not none and (agenda[my_calendar].events | length) > 0 %}{% for event in agenda[my_calendar].events if as_timestamp(event.start) | timestamp_custom('%Y-%m-%d') <= as_timestamp(now()) | timestamp_custom('%Y-%m-%d') %}{% if not ns.today_prefix_shown and my_today != '' %}{{ my_today }} {% set ns.today_prefix_shown = true %}{% endif %}{% if as_timestamp(event.end) > as_timestamp(now()) %}{% if as_timestamp(event.start) | timestamp_custom('%H:%M') == '00:00' %}{% if my_show_whole_day_events == true %}{{ event.summary }}{% set ns.today_events_exist = true %}{% if not loop.last %} // {% endif %}{% endif %}{% else %}{{ as_timestamp(event.start) | timestamp_custom('%H:%M')}} {{ event.summary }}{% set ns.today_events_exist = true %}{% if not loop.last %} // {% endif %}{% endif %}{% endif %}{% endfor %}{% for event in agenda[my_calendar].events if (as_timestamp(event.start) | timestamp_custom('%Y-%m-%d') > as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ) %}{% if not ns.tomorrow_prefix_shown and my_tomorrow != '' %}{% if ns.today_events_exist and my_tomorrow != '' %} //{% endif %} {{ my_tomorrow }} {% set ns.tomorrow_prefix_shown = true %}{% endif %}{% if not ns.tomorrow_prefix_shown and my_tomorrow == '' %}{% if ns.today_events_exist %} // {% endif %}{% set ns.tomorrow_prefix_shown = true %}{% endif %}{% if as_timestamp(event.end) > as_timestamp(now()) %}{% if as_timestamp(event.start) | timestamp_custom('%H:%M') == '00:00' %}{% if my_show_whole_day_events == true %}{{ event.summary }}{% if not loop.last %} // {% endif %}{% endif %}{% else %}{{ as_timestamp(event.start) | timestamp_custom('%H:%M')}} {{ event.summary }}{% if not loop.last %} // {% endif %}{% endif %}{% endif %}{% endfor %}{% else %}{{ my_text }}{% endif %}
+      app_payload: >-
+        {# Home Assistant renders any template entered in the text inputs and then applies
+           native-type parsing, so a numeric result comes back as a NUMBER. AWTRIX NG
+           rejects the whole payload when "text" is not a string, leaving a blank display. #}
+        {% set app_text = agenda_text
+                          if (agenda_text is sequence and agenda_text is not string
+                              and agenda_text is not mapping)
+                          else agenda_text | string %}
+        {{ {
+             "text": app_text,
+             "icon": my_icon | string,
+             "backgroundColor": background_color,
+             "textColor": "palette" if show_rainbow else text_color,
+             "palette": "Rainbow" if show_rainbow else none,
+             "textCase": text_case,
+             "iconMode": icon_mode,
+             "repeat": my_repeat | int(0),
+             "durationMs": (my_duration | int(0)) * 1000,
+             "lifetimeMs": (my_lifetime | int(0)) * 1000,
+             "lifetimeExpiry": lifetime_expiry,
+             "scroll": scroll_obj,
+             "effect": effect
+           } | tojson }}
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+          - condition: template
+            value_template: "{{ my_show_timeline == true }}"
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ agenda[my_calendar].events | length > 0 }}"
+              - condition: template
+                value_template: "{{ agenda[my_calendar].events | length <= 0 and my_show_empty_calendar == true }}"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
+      - conditions:
+          - condition: trigger
+            id: "Calendar_Event_Trigger"
+          - condition: template
+            value_template: "{{ my_show_alerts == true }}"
+        sequence:
+          - variables:
+              notify_payload: >-
+                {{ {
+                     "text": "Event " ~ trigger.calendar_event.summary ~ " starts at "
+                             ~ (as_timestamp(trigger.calendar_event.start, true) | timestamp_custom('%H:%M')),
+                     "icon": my_icon | string,
+                     "backgroundColor": background_color,
+                     "textColor": "palette" if show_rainbow else text_color,
+                     "palette": "Rainbow" if show_rainbow else none,
+                     "textCase": text_case,
+                     "iconMode": icon_mode,
+                     "stack": stack,
+                     "repeat": my_repeat | int(0),
+                     "durationMs": (my_duration | int(0)) * 1000,
+                     "scroll": scroll_obj,
+                     "effect": effect,
+                     "sound": sound_name if play_alert_tone else "",
+                     "soundRtttl": sound_rtttl if (play_alert_tone and not sound_name) else ""
+                   } | tojson }}
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/notify' }}"
+                    payload: "{{ notify_payload }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                # An empty payload on cmd/apps/pushed/<name> deletes the app.
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: ""
+      - conditions:
+          - condition: and
+            conditions:
+              - condition: trigger
+                id: "Changes"
+              - condition: state
+                entity_id: !input toggle_helper
+                state: "on"
+              - condition: template
+                value_template: "{{ my_show_timeline == true }}"
+              - condition: or
+                conditions:
+                  - condition: template
+                    value_template: "{{ agenda[my_calendar].events | length > 0 }}"
+                  - condition: template
+                    value_template: "{{ agenda[my_calendar].events | length <= 0 and my_show_empty_calendar == true }}"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - condition: template
+                  value_template: "{{ switch_to_app == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"

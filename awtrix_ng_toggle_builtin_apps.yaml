@@ -1,0 +1,211 @@
+##########
+# AWTRIX NG - Toggle Built-in Apps
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+#
+# HOW THIS WORKS
+# AWTRIX NG has no "hide one app" command. Switching apps off is done with the
+# "disabled" list on <prefix>/cmd/apps/order, which names exactly what is off:
+#
+#   {"disabled":["Date","Battery"]}
+#
+# Two rules from the AWTRIX NG documentation make this simple and safe:
+#   * "disabled is always required, order is optional." Sending disabled on its own
+#     switches those apps off and leaves your arrangement exactly as it was - the
+#     rotation order never has to be resent, so this blueprint never touches it.
+#   * "An app in neither list keeps what it had." Your pushed apps and scripts are
+#     not named here, so they are left alone.
+#
+# A switched-off app stays installed. It keeps appearing in GET /api/v1/apps with
+# enabled: false, and switching it back on restores it to the slot it always had.
+# The off-list is written to flash, so it survives a reboot.
+##########
+
+blueprint:
+  name: AWTRIX NG Toggle Built-in Apps
+  description: >-
+    Switches the five built-in AWTRIX NG apps - Time, Date, Temperature, Humidity and
+    Battery - on and off from five toggle helpers. The rotation order is left
+    untouched, and your pushed apps and scripts are not affected. Built for the
+    AWTRIX NG MQTT API. V2.0
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    display_section:
+      name: Displays
+      icon: mdi:television
+      input:
+        awtrix_displays:
+          name: AWTRIX Displays
+          description: >-
+            Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+            device - the blueprint reads its MQTT prefix from the "MQTT prefix"
+            sensor.
+          selector:
+            device:
+              filter:
+                - integration: mqtt
+                  manufacturer: Blueforcer
+              multiple: true
+          default: []
+        extra_prefixes:
+          name: Extra MQTT prefixes
+          description: >-
+            Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+            the mqttPrefix from their MQTT settings, or the 12-character device uid
+            when that field is empty. Commands go to <prefix>/cmd/apps/order.
+          selector:
+            text:
+              multiple: true
+          default: []
+    toggle_section:
+      name: Toggle helpers
+      icon: mdi:toggle-switch
+      input:
+        toggle_time:
+          name: Time app
+          description: Toggle helper that switches the built-in Time app on and off.
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        toggle_date:
+          name: Date app
+          description: Toggle helper that switches the built-in Date app on and off.
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        toggle_temperature:
+          name: Temperature app
+          description: >-
+            Toggle helper that switches the built-in Temperature app on and off.
+            Needs a detected I2C sensor.
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        toggle_humidity:
+          name: Humidity app
+          description: >-
+            Toggle helper that switches the built-in Humidity app on and off. Needs a
+            sensor with a humidity element - without one the app does not exist and
+            naming it does nothing.
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+        toggle_battery:
+          name: Battery app
+          description: >-
+            Toggle helper that switches the built-in Battery app on and off. Needs a
+            board with a battery pin - without one the app does not exist and naming
+            it does nothing.
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
+    advanced_section:
+      name: Advanced options
+      icon: mdi:cog
+      collapsed: true
+      input:
+        apply_on_start:
+          name: Apply on Home Assistant start
+          description: >-
+            Republish the off-list when Home Assistant starts, so the clock matches
+            your toggles again after a restart. AWTRIX NG stores the off-list in
+            flash, so this is only a safety net.
+          selector:
+            boolean:
+          default: true
+
+mode: queued
+max: 25
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_time
+    to: ["on", "off"]
+    id: "Toggle"
+  - trigger: state
+    entity_id: !input toggle_date
+    to: ["on", "off"]
+    id: "Toggle"
+  - trigger: state
+    entity_id: !input toggle_temperature
+    to: ["on", "off"]
+    id: "Toggle"
+  - trigger: state
+    entity_id: !input toggle_humidity
+    to: ["on", "off"]
+    id: "Toggle"
+  - trigger: state
+    entity_id: !input toggle_battery
+    to: ["on", "off"]
+    id: "Toggle"
+  - trigger: homeassistant
+    event: start
+    id: "Start"
+
+conditions:
+  - condition: or
+    conditions:
+      - condition: trigger
+        id: "Toggle"
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: "Start"
+          - condition: template
+            value_template: "{{ apply_on_start }}"
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  toggle_time: !input toggle_time
+  toggle_date: !input toggle_date
+  toggle_temperature: !input toggle_temperature
+  toggle_humidity: !input toggle_humidity
+  toggle_battery: !input toggle_battery
+  apply_on_start: !input apply_on_start
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # The complete off-list: a built-in is named only when its helper is explicitly
+  # off. A helper that is unavailable or unknown leaves its app switched on, which
+  # is the safer failure. Anything not named here is switched on by the same call.
+  disabled_list: >-
+    {% set ns = namespace(d=[]) %}
+    {% if is_state(toggle_time, 'off') %}{% set ns.d = ns.d + ['Time'] %}{% endif %}
+    {% if is_state(toggle_date, 'off') %}{% set ns.d = ns.d + ['Date'] %}{% endif %}
+    {% if is_state(toggle_temperature, 'off') %}{% set ns.d = ns.d + ['Temperature'] %}{% endif %}
+    {% if is_state(toggle_humidity, 'off') %}{% set ns.d = ns.d + ['Humidity'] %}{% endif %}
+    {% if is_state(toggle_battery, 'off') %}{% set ns.d = ns.d + ['Battery'] %}{% endif %}
+    {{ ns.d }}
+
+actions:
+  - repeat:
+      for_each: "{{ targets }}"
+      sequence:
+        # The JSON is built HERE, in the payload field, and never stored in a
+        # variable first. Home Assistant parses a rendered JSON string back into a
+        # Python dict, and rendering that a second time emits single quotes, which
+        # AWTRIX NG rejects as invalid JSON.
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: "{{ repeat.item ~ '/cmd/apps/order' }}"
+            payload: "{{ {'disabled': disabled_list} | tojson }}"

@@ -1,0 +1,358 @@
+##########
+# AWTRIX NG - Create Notification
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Create Notification
+  description: >-
+    Shows a notification on one or more AWTRIX NG displays while a toggle helper is
+    on, and dismisses it again when the toggle goes off. Built for the AWTRIX NG
+    MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/notify.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the notification on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    notification_text:
+      name: Notification Text
+      description: Enter the notification text.
+      default: ""
+    my_icon:
+      name: Icon
+      description: Enter the Icon Name or ID of the icon that you like to show.
+      selector:
+        text:
+      default: ""
+    icon_mode:
+      name: Push Icon
+      description: Icon behavior.
+      selector:
+        select:
+          options:
+            - label: "Icon doesn't move"
+              value: "fixed"
+            - label: "Icon moves with text and will not appear again"
+              value: "pushOnce"
+            - label: "Icon moves with text but appears again when the text starts"
+              value: "push"
+          mode: dropdown
+      default: "push"
+    text_section:
+      name: Text options
+      icon: mdi:text
+      collapsed: true
+      input:
+        text_case:
+          name: Text Case
+          description: Select how you would like your text to display.
+          selector:
+            select:
+              options:
+                - label: "Use global setting"
+                  value: "inherit"
+                - label: "Force Uppercase"
+                  value: "upper"
+                - label: "Show as you entered it"
+                  value: "asTyped"
+              mode: dropdown
+          default: "inherit"
+        background_color:
+          name: Background Color
+          description: Select the Background color.
+          selector:
+            color_rgb:
+          default: [0, 0, 0]
+        text_color:
+          name: Text Color
+          description: Select the Text color.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_1:
+          name: Gradient 1
+          description: >-
+            First gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_2:
+          name: Gradient 2
+          description: >-
+            Second gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        show_rainbow:
+          name: Rainbow Colors
+          description: >-
+            Should the notification be shown in Rainbow colors? This overwrites the
+            Gradient setting.
+          selector:
+            boolean:
+          default: false
+    advanced_section:
+      name: Advanced options
+      icon: mdi:cog
+      collapsed: true
+      input:
+        notification_name:
+          name: Notification Name
+          description: >-
+            Optional label for this notification. With a name set, switching the
+            toggle off dismisses exactly this notification wherever it sits in the
+            queue instead of whatever is on screen. Use letters, digits, - and _.
+          selector:
+            text:
+          default: ""
+        play_alert_tone:
+          name: Play Alert Tone
+          description: Should an alert tone be played?
+          selector:
+            boolean:
+          default: false
+        sound_name:
+          name: Sound File / Track
+          description: >-
+            Optional. Buzzer: the name of a melody in /MELODIES (without .txt).
+            DFPlayer: the track number. Leave empty to play the RTTTL melody below.
+            Only used when "Play Alert Tone" is on.
+          selector:
+            text:
+          default: ""
+        sound_rtttl:
+          name: Alert Melody (RTTTL)
+          description: >-
+            Melody played when "Play Alert Tone" is on and no sound file is set.
+          selector:
+            text:
+          default: "alert:d=4,o=5,b=180:8c6,8p,8c6,8p,8c6"
+        hold_notification:
+          name: Hold Notification
+          description: >-
+            Should the notification stay on the display until it's manually
+            dismissed? (Overrides Repeat & Duration).
+          selector:
+            boolean:
+          default: true
+        repeat:
+          name: Repeat
+          description: >-
+            How many times the text is scrolled through the matrix before the app
+            ends. 0 turns it off and the duration is used instead.
+          default: "0"
+        duration:
+          name: Duration (in seconds)
+          description: Sets how long the app should be displayed. 0 is global app time.
+          default: "0"
+        stack:
+          name: Stack Notification?
+          description: >-
+            Defines if the notification will be stacked. "Off" will immediately
+            replace the current notification.
+          selector:
+            boolean:
+          default: true
+        scroll:
+          name: Scroll the notification?
+          description: Enables text scrolling.
+          selector:
+            boolean:
+          default: true
+        scrollspeed:
+          name: Scroll Speed Percentage
+          description: Modifies the scrollspeed. You need to enter a percentage value.
+          selector:
+            number:
+              mode: slider
+              min: 0
+              max: 200
+          default: 100
+        effect:
+          name: Effect
+          description: Select a background effect (optional).
+          selector:
+            select:
+              options:
+                - label: "None"
+                  value: ""
+                - label: "BrickBreaker"
+                  value: "BrickBreaker"
+                - label: "Checkerboard"
+                  value: "Checkerboard"
+                - label: "ColorWaves"
+                  value: "ColorWaves"
+                - label: "Fade"
+                  value: "Fade"
+                - label: "Fireworks"
+                  value: "Fireworks"
+                - label: "LookingEyes"
+                  value: "LookingEyes"
+                - label: "Matrix"
+                  value: "Matrix"
+                - label: "MovingLine"
+                  value: "MovingLine"
+                - label: "PingPong"
+                  value: "PingPong"
+                - label: "Pacifica"
+                  value: "Pacifica"
+                - label: "Plasma"
+                  value: "Plasma"
+                - label: "PlasmaCloud"
+                  value: "PlasmaCloud"
+                - label: "Radar"
+                  value: "Radar"
+                - label: "Ripple"
+                  value: "Ripple"
+                - label: "Snake"
+                  value: "Snake"
+                - label: "SwirlIn"
+                  value: "SwirlIn"
+                - label: "SwirlOut"
+                  value: "SwirlOut"
+                - label: "TheaterChase"
+                  value: "TheaterChase"
+                - label: "TwinklingStars"
+                  value: "TwinklingStars"
+          default: ""
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  notification_name: !input notification_name
+  notification_text: !input notification_text
+  my_icon: !input my_icon
+  icon_mode: !input icon_mode
+  text_case: !input text_case
+  background_color: !input background_color
+  text_color: !input text_color
+  gradient_1: !input gradient_1
+  gradient_2: !input gradient_2
+  show_rainbow: !input show_rainbow
+  play_alert_tone: !input play_alert_tone
+  sound_name: !input sound_name
+  sound_rtttl: !input sound_rtttl
+  hold_notification: !input hold_notification
+  my_repeat: !input repeat
+  my_duration: !input duration
+  stack: !input stack
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  notify_payload: >-
+    {% set use_palette = show_rainbow or (gradient_1 != gradient_2) %}
+    {# Home Assistant renders any template entered in "notification_text" and then
+       applies native-type parsing, so "{{ states('sensor.x') | round(1) }}" comes back
+       as a NUMBER. AWTRIX NG validates strictly and rejects the WHOLE payload when
+       "text" is not a string, which leaves a blank display. Cast to a string, unless
+       the template produced a fragment array (a list), which AWTRIX NG accepts. #}
+    {% set app_text = notification_text
+                      if (notification_text is sequence
+                          and notification_text is not string
+                          and notification_text is not mapping)
+                      else notification_text | string %}
+    {{ {
+         "name": notification_name | string,
+         "text": app_text,
+         "icon": my_icon | string,
+         "backgroundColor": background_color,
+         "textColor": "palette" if use_palette else text_color,
+         "palette": "Rainbow" if show_rainbow
+                    else ([gradient_1, gradient_2] if gradient_1 != gradient_2 else none),
+         "textCase": text_case,
+         "iconMode": icon_mode,
+         "hold": hold_notification,
+         "stack": stack,
+         "repeat": my_repeat | int(0),
+         "durationMs": (my_duration | int(0)) * 1000,
+         "scroll": {"mode": "static"} if not scrolling
+                   else {"speed": scroll_speed | int(100)},
+         "effect": effect,
+         "sound": sound_name if play_alert_tone else "",
+         "soundRtttl": sound_rtttl if (play_alert_tone and not sound_name) else ""
+       } | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/notify' }}"
+                    payload: "{{ notify_payload }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: >-
+                      {{ repeat.item ~ '/cmd/notify/dismiss'
+                         ~ ('/' ~ notification_name if notification_name else '') }}
+                    payload: ""

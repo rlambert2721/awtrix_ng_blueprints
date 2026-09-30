@@ -1,0 +1,285 @@
+##########
+# AWTRIX NG - Rain Forecast
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Rain Forecast
+  description: >-
+    Shows an hourly rain forecast as a bar or line chart on one or more AWTRIX NG
+    displays while a toggle helper is on, and removes the app again when the toggle
+    goes off. Built for the AWTRIX NG MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/apps/pushed/rain_forecast.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the App on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    my_sensor:
+      name: Sensor
+      description: Select your Weather Sensor.
+      selector:
+        entity:
+          filter:
+            - domain: weather
+    graph_type:
+      name: Graph Type
+      description: Select bar chart or line chart.
+      selector:
+        select:
+          options:
+            - label: "Bar Chart"
+              value: "barChart"
+            - label: "Line Chart"
+              value: "lineChart"
+          mode: dropdown
+      default: "barChart"
+    graph_color:
+      name: Graph Color
+      description: Select the Graph color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    background_color:
+      name: Background Color
+      description: Select the Background color.
+      selector:
+        color_rgb:
+      default: [0, 0, 0]
+    autoscale:
+      name: Autoscale
+      description: Enables or disables autoscaling for the bar and line chart.
+      selector:
+        boolean:
+      default: true
+    my_text:
+      name: Custom Text
+      description: Text to show when no rain is expected.
+      selector:
+        text:
+      default: "No rain expected"
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+            - label: "Use global setting"
+              value: "inherit"
+            - label: "Force Uppercase"
+              value: "upper"
+            - label: "Show as you entered it"
+              value: "asTyped"
+          mode: dropdown
+      default: "inherit"
+    show_rainbow:
+      name: Rainbow Colors
+      description: Should the text be shown in Rainbow colors?
+      selector:
+        boolean:
+      default: false
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      default: "0"
+    lifetime:
+      name: Lifetime (in seconds)
+      description: >-
+        How long the app stays alive before it is removed from the app cycle
+        automatically. 0 is infinite lifetime.
+      default: "0"
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: >-
+        What happens when the lifetime runs out. "Remove" drops the app from the
+        rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+            - label: "Remove the app"
+              value: "remove"
+            - label: "Mark the app as stale"
+              value: "mark"
+          mode: dropdown
+      default: "remove"
+    switch_to_app:
+      name: Switch to app on value change
+      description: Should the clock switch to the app immediately when the forecast changes?
+      selector:
+        boolean:
+      default: false
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+  - trigger: state
+    entity_id: !input my_sensor
+    id: Changes
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 2
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  my_sensor: !input my_sensor
+  graph_type: !input graph_type
+  autoscale: !input autoscale
+  text_case: !input text_case
+  show_rainbow: !input show_rainbow
+  graph_color: !input graph_color
+  background_color: !input background_color
+  my_duration: !input duration
+  my_text: !input my_text
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  app_name: "rain_forecast"
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+
+actions:
+  - variables:
+      weather_entity: !input my_sensor
+      forecast: "{{ state_attr(weather_entity, 'forecast') }}"
+  - action: weather.get_forecasts
+    data:
+      type: hourly
+    response_variable: my_forecast
+    target:
+      entity_id: !input my_sensor
+    continue_on_error: true
+  - variables:
+      my_graph_data: >
+        {% set f = forecast if forecast is not none else my_forecast[my_sensor].forecast %}
+        {{ f[:11] | map(attribute='precipitation') | map('multiply', 100) | map('round', 0) | map('int') | list }}
+      # AWTRIX NG: bar -> barChart, line -> lineChart, autoscale -> chartAutoscale,
+      # and charts have their own chartColor instead of sharing "color" with the text.
+      app_payload: >-
+        {% set data = my_graph_data | from_json if my_graph_data is string else my_graph_data %}
+        {{ ({
+             "chartAutoscale": autoscale,
+             "chartColor": "palette" if show_rainbow else graph_color,
+             "text": "" if (data | sum) > 0 else my_text | string,
+             "backgroundColor": background_color,
+             "textColor": "palette" if show_rainbow else graph_color,
+             "palette": "Rainbow" if show_rainbow else none,
+             "icon": states(my_sensor),
+             "textCase": text_case,
+             "durationMs": (my_duration | int(0)) * 1000,
+             "lifetimeMs": (my_lifetime | int(0)) * 1000,
+             "lifetimeExpiry": lifetime_expiry
+           } | combine({graph_type: data})) | tojson }}
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                # An empty payload on cmd/apps/pushed/<name> deletes the app.
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: ""
+      - conditions:
+          - condition: and
+            conditions:
+              - condition: trigger
+                id: Changes
+              - condition: state
+                entity_id: !input toggle_helper
+                state: "on"
+              - condition: not
+                conditions:
+                  - condition: state
+                    entity_id: !input my_sensor
+                    state:
+                      - unavailable
+                      - unknown
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - condition: template
+                  value_template: "{{ switch_to_app == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"

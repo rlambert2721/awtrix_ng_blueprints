@@ -1,0 +1,84 @@
+##########
+# AWTRIX NG - Set App Time
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Set App Time
+  description: >-
+    Sets how long each app is shown on one or more AWTRIX NG displays, from a number
+    helper holding the time in seconds. AWTRIX NG stores this as appDurationMs, so
+    the value is converted to milliseconds. V1.0
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/settings.
+      selector:
+        text:
+          multiple: true
+      default: []
+    apptime_helper:
+      name: App Time Number Helper
+      description: Select the App Time Number Helper that stores the App time (in seconds).
+      selector:
+        entity:
+          filter:
+            - domain: input_number
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input apptime_helper
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  apptime_entity: !input apptime_helper
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  settings_payload: >-
+    {{ {"appDurationMs": ((states(apptime_entity) | float(7)) * 1000) | round(0) | int} | tojson }}
+
+conditions:
+  - condition: template
+    value_template: "{{ states(apptime_entity) not in ['unknown', 'unavailable', ''] }}"
+
+actions:
+  - repeat:
+      for_each: "{{ targets }}"
+      sequence:
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: "{{ repeat.item ~ '/cmd/settings' }}"
+            payload: "{{ settings_payload }}"

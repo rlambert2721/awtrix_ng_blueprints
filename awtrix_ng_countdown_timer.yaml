@@ -1,0 +1,488 @@
+##########
+# AWTRIX NG - Countdown Timer
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Countdown Timer
+  description: >-
+    Shows a countdown to a specific date and time as a pushed app on one or more
+    AWTRIX NG displays while a toggle helper is on, updating every minute. Built for
+    the AWTRIX NG MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/apps/pushed/<app name>.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the App on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    countdown_title:
+      name: Event Name
+      description: >-
+        Enter a short name for your event. This is used as the app identifier on the
+        clock and shown as a label (e.g. "Birthday", "Vacation", "New Year"). AWTRIX
+        NG app names allow letters, digits, - and _ only, so anything else is replaced
+        with an underscore.
+      selector:
+        text:
+      default: "Countdown"
+    event_date:
+      name: Event Date
+      description: Enter the target date in YYYY-MM-DD format (e.g. 2026-12-31).
+      selector:
+        text:
+      default: "2026-12-31"
+    event_time:
+      name: Event Time
+      description: >-
+        Enter the target time in HH:MM:SS format using 24-hour notation (e.g.
+        00:00:00).
+      selector:
+        text:
+      default: "00:00:00"
+    show_title:
+      name: Show Event Name on Clock
+      description: >-
+        If enabled, the event name is shown as a prefix before the countdown (e.g.
+        "Vacation 3d 4h 20m 10s"). Disable to show only the countdown value.
+      selector:
+        boolean:
+      default: true
+    show_seconds:
+      name: Show Seconds
+      description: >-
+        If enabled, seconds are included in the countdown display. Note: the
+        automation updates every minute, so seconds are approximate.
+      selector:
+        boolean:
+      default: true
+    event_started_message:
+      name: Event Started Message
+      description: >-
+        Message to display from the moment the event starts until midnight of the same
+        day. Leave empty to skip straight to the Event Reached Text below.
+      selector:
+        text:
+      default: ""
+    event_reached_text:
+      name: Event Reached Text
+      description: >-
+        Fallback text to display once the event day has ended. Also used on the event
+        day if Event Started Message is left empty. Leave empty to remove the app
+        automatically after the event.
+      selector:
+        text:
+      default: "Now!"
+    my_icon:
+      name: Icon
+      description: Enter the Icon Name or ID of the icon that you like to show.
+      selector:
+        text:
+      default: ""
+    icon_mode:
+      name: Push Icon
+      description: Icon behavior.
+      selector:
+        select:
+          options:
+            - label: "Icon doesn't move"
+              value: "fixed"
+            - label: "Icon moves with text and will not appear again"
+              value: "pushOnce"
+            - label: "Icon moves with text but appears again when the text starts"
+              value: "push"
+          mode: dropdown
+      default: "push"
+    text_section:
+      name: Text options
+      icon: mdi:text
+      collapsed: true
+      input:
+        text_case:
+          name: Text Case
+          description: Select how you would like your text to display.
+          selector:
+            select:
+              options:
+                - label: "Use global setting"
+                  value: "inherit"
+                - label: "Force Uppercase"
+                  value: "upper"
+                - label: "Show as you entered it"
+                  value: "asTyped"
+              mode: dropdown
+          default: "inherit"
+        background_color:
+          name: Background Color
+          description: Select the Background color.
+          selector:
+            color_rgb:
+          default: [0, 0, 0]
+        text_color:
+          name: Text Color
+          description: Select the Text color.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_1:
+          name: Gradient 1
+          description: >-
+            First gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_2:
+          name: Gradient 2
+          description: >-
+            Second gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        show_rainbow:
+          name: Rainbow Colors
+          description: >-
+            Should the text be shown in Rainbow colors? This overwrites the Gradient
+            setting.
+          selector:
+            boolean:
+          default: false
+    advanced_section:
+      name: Advanced options
+      icon: mdi:cog
+      collapsed: true
+      input:
+        repeat:
+          name: Repeat
+          description: >-
+            How many times the text is scrolled through the matrix before the app
+            ends. 0 turns it off and the duration is used instead.
+          default: "0"
+        duration:
+          name: Duration (in seconds)
+          description: Sets how long the app should be displayed. 0 is global app time.
+          default: "0"
+        lifetime:
+          name: Lifetime (in seconds)
+          description: >-
+            How long the app stays alive before it is removed from the app cycle
+            automatically. 0 is infinite lifetime.
+          default: "0"
+        lifetime_expiry:
+          name: On lifetime expiry
+          description: >-
+            What happens when the lifetime runs out. "Remove" drops the app from the
+            rotation, "Mark" keeps it and draws a dark red frame around it.
+          selector:
+            select:
+              options:
+                - label: "Remove the app"
+                  value: "remove"
+                - label: "Mark the app as stale"
+                  value: "mark"
+              mode: dropdown
+          default: "remove"
+        switch_to_app:
+          name: Switch to app on update
+          description: >-
+            Should the clock switch to the countdown app immediately when the value
+            updates every minute?
+          selector:
+            boolean:
+          default: false
+        scroll:
+          name: Scroll the text?
+          description: Enables text scrolling.
+          selector:
+            boolean:
+          default: true
+        scrollspeed:
+          name: Scroll Speed Percentage
+          description: Modifies the scrollspeed. You need to enter a percentage value.
+          selector:
+            number:
+              mode: slider
+              min: 0
+              max: 200
+          default: 100
+        effect:
+          name: Effect
+          description: Select a background effect (optional).
+          selector:
+            select:
+              options:
+                - label: "None"
+                  value: ""
+                - label: "BrickBreaker"
+                  value: "BrickBreaker"
+                - label: "Checkerboard"
+                  value: "Checkerboard"
+                - label: "ColorWaves"
+                  value: "ColorWaves"
+                - label: "Fade"
+                  value: "Fade"
+                - label: "Fireworks"
+                  value: "Fireworks"
+                - label: "LookingEyes"
+                  value: "LookingEyes"
+                - label: "Matrix"
+                  value: "Matrix"
+                - label: "MovingLine"
+                  value: "MovingLine"
+                - label: "PingPong"
+                  value: "PingPong"
+                - label: "Pacifica"
+                  value: "Pacifica"
+                - label: "Plasma"
+                  value: "Plasma"
+                - label: "PlasmaCloud"
+                  value: "PlasmaCloud"
+                - label: "Radar"
+                  value: "Radar"
+                - label: "Ripple"
+                  value: "Ripple"
+                - label: "Snake"
+                  value: "Snake"
+                - label: "SwirlIn"
+                  value: "SwirlIn"
+                - label: "SwirlOut"
+                  value: "SwirlOut"
+                - label: "TheaterChase"
+                  value: "TheaterChase"
+                - label: "TwinklingStars"
+                  value: "TwinklingStars"
+              mode: dropdown
+          default: ""
+
+mode: queued
+max: 60
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+  - trigger: time_pattern
+    minutes: "/1"
+    id: "Tick"
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  countdown_title: !input countdown_title
+  event_date: !input event_date
+  event_time: !input event_time
+  show_title: !input show_title
+  show_seconds: !input show_seconds
+  event_started_message: !input event_started_message
+  event_reached_text: !input event_reached_text
+  my_icon: !input my_icon
+  icon_mode: !input icon_mode
+  background_color: !input background_color
+  text_color: !input text_color
+  text_case: !input text_case
+  gradient_1: !input gradient_1
+  gradient_2: !input gradient_2
+  show_rainbow: !input show_rainbow
+  my_repeat: !input repeat
+  my_duration: !input duration
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # AWTRIX NG app names must match [A-Za-z0-9_-]{1,32}.
+  app_name: >-
+    {{ ((countdown_title | trim | lower | replace(' ', '_'))
+        | regex_replace('[^A-Za-z0-9_-]', '_'))[:32] | default('countdown', true) }}
+  target_timestamp: >-
+    {{ (event_date ~ " " ~ event_time) | as_datetime | as_local | as_timestamp }}
+  seconds_remaining: >-
+    {{ [(target_timestamp - now() | as_timestamp) | int, 0] | max }}
+  event_passed: >-
+    {{ (target_timestamp - now() | as_timestamp) | int <= 0 }}
+  is_event_day: >-
+    {{ now().date() | string == event_date }}
+  countdown_days: >-
+    {{ (seconds_remaining // 86400) | int }}
+  countdown_hours: >-
+    {{ ((seconds_remaining % 86400) // 3600) | int }}
+  countdown_minutes: >-
+    {{ ((seconds_remaining % 3600) // 60) | int }}
+  countdown_seconds: >-
+    {{ (seconds_remaining % 60) | int }}
+  countdown_text: >-
+    {% if event_passed %}
+      {% if is_event_day and event_started_message | string | trim != '' %}
+        {{ event_started_message }}
+      {% else %}
+        {{ event_reached_text }}
+      {% endif %}
+    {% else %}
+      {% set title_prefix = (countdown_title ~ " ") if show_title else "" %}
+      {% if countdown_days > 0 %}
+        {% if show_seconds %}
+          {{ title_prefix }}{{ countdown_days }}d {{ countdown_hours }}h {{ countdown_minutes }}m {{ countdown_seconds }}s
+        {% else %}
+          {{ title_prefix }}{{ countdown_days }}d {{ countdown_hours }}h {{ countdown_minutes }}m
+        {% endif %}
+      {% elif countdown_hours > 0 %}
+        {% if show_seconds %}
+          {{ title_prefix }}{{ countdown_hours }}h {{ countdown_minutes }}m {{ countdown_seconds }}s
+        {% else %}
+          {{ title_prefix }}{{ countdown_hours }}h {{ countdown_minutes }}m
+        {% endif %}
+      {% else %}
+        {% if show_seconds %}
+          {{ title_prefix }}{{ countdown_minutes }}m {{ countdown_seconds }}s
+        {% else %}
+          {{ title_prefix }}{{ countdown_minutes }}m
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  app_payload: >-
+    {% set use_palette = show_rainbow or (gradient_1 != gradient_2) %}
+    {{ {
+         "text": countdown_text | string | trim,
+         "icon": my_icon | string,
+         "backgroundColor": background_color,
+         "textColor": "palette" if use_palette else text_color,
+         "palette": "Rainbow" if show_rainbow
+                    else ([gradient_1, gradient_2] if gradient_1 != gradient_2 else none),
+         "textCase": text_case,
+         "iconMode": icon_mode,
+         "repeat": my_repeat | int(0),
+         "durationMs": (my_duration | int(0)) * 1000,
+         "lifetimeMs": (my_lifetime | int(0)) * 1000,
+         "lifetimeExpiry": lifetime_expiry,
+         "scroll": {"mode": "static"} if not scrolling
+                   else {"speed": scroll_speed | int(100)},
+         "effect": effect
+       } | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                # An empty payload on cmd/apps/pushed/<name> deletes the app.
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: ""
+      - conditions:
+          - condition: trigger
+            id: "Tick"
+          - condition: state
+            entity_id: !input toggle_helper
+            state: "on"
+        sequence:
+          - choose:
+              # Event has passed with no applicable message - remove the app
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {% set started_empty = event_started_message | string | trim == '' %}
+                      {% set reached_empty = event_reached_text | string | trim == '' %}
+                      {{ event_passed and (
+                           (is_event_day and started_empty and reached_empty)
+                           or (not is_event_day and reached_empty)
+                         ) }}
+                sequence:
+                  - repeat:
+                      for_each: "{{ targets }}"
+                      sequence:
+                        - action: mqtt.publish
+                          data:
+                            qos: 0
+                            retain: false
+                            topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                            payload: ""
+            default:
+              - repeat:
+                  for_each: "{{ targets }}"
+                  sequence:
+                    - action: mqtt.publish
+                      data:
+                        qos: 0
+                        retain: false
+                        topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                        payload: "{{ app_payload }}"
+                    - condition: template
+                      value_template: "{{ switch_to_app == true }}"
+                    - action: mqtt.publish
+                      data:
+                        qos: 0
+                        retain: false
+                        topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                        payload: "{{ app_name }}"

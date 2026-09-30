@@ -1,0 +1,135 @@
+##########
+# AWTRIX NG - Moodlight
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Moodlight
+  description: >-
+    Turns one or more AWTRIX NG displays into a moodlight while a toggle helper is
+    on, and switches the moodlight off again when the toggle goes off. Built for the
+    AWTRIX NG MQTT API. V1.0
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/display/moodlight.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the moodlight on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    brightness:
+      name: Brightness
+      description: >-
+        WARNING This function causes much higher current draw and heat, because every
+        pixel is lit. Keep the brightness value low (between 0 and 200). The clock may
+        turn off if the brightness level is too high when running on battery power!
+      selector:
+        number:
+          min: 0
+          max: 255
+      default: 100
+    moodlight_color:
+      name: Color
+      description: Select the Moodlight color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    moodlight_kelvin:
+      name: Kelvin value
+      description: >-
+        Enter a Kelvin value. AWTRIX NG clamps this to 1000-40000. A value of 0
+        disables Kelvin. When Kelvin is used the color above is ignored.
+      selector:
+        number:
+          min: 0
+          max: 40000
+      default: 0
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  brightness: !input brightness
+  moodlight_color: !input moodlight_color
+  moodlight_kelvin: !input moodlight_kelvin
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  moodlight_payload: >-
+    {{ ({"brightness": brightness | int(100)}
+         | combine({"kelvin": moodlight_kelvin | int(0)} if (moodlight_kelvin | int(0)) > 0
+                   else {"color": moodlight_color})) | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/display/moodlight' }}"
+                    payload: "{{ moodlight_payload }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/display/moodlight' }}"
+                    payload: ""

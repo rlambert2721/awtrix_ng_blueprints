@@ -1,0 +1,441 @@
+##########
+# AWTRIX NG - Create Sensor App
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Create Sensor App
+  description: >-
+    Shows a Home Assistant sensor as a pushed app on one or more AWTRIX NG displays
+    while a toggle helper is on, and removes the app again when the toggle goes off.
+    Built for the AWTRIX NG MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/apps/pushed/<app name>.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the App on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    my_sensor:
+      name: Sensor
+      description: >-
+        Select the Sensor or Media Player whose state you want to show. The app value
+        changes whenever this entity changes.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - sensor
+                - media_player
+                - input_text
+    my_template_sensor:
+      name: Template (Optional)
+      description: Enter a template to format your sensor the way you like it. (Advanced mode)
+      selector:
+        text:
+      default: ""
+    my_icon:
+      name: Icon
+      description: Enter the Icon Name or ID of the icon that you like to show.
+      selector:
+        text:
+      default: ""
+    icon_mode:
+      name: Push Icon
+      description: Icon behavior.
+      selector:
+        select:
+          options:
+            - label: "Icon doesn't move"
+              value: "fixed"
+            - label: "Icon moves with text and will not appear again"
+              value: "pushOnce"
+            - label: "Icon moves with text but appears again when the text starts"
+              value: "push"
+          mode: dropdown
+      default: "push"
+    text_section:
+      name: Text options
+      icon: mdi:text
+      collapsed: true
+      input:
+        text_case:
+          name: Text Case
+          description: Select how you would like your text to display.
+          selector:
+            select:
+              options:
+                - label: "Use global setting"
+                  value: "inherit"
+                - label: "Force Uppercase"
+                  value: "upper"
+                - label: "Show as you entered it"
+                  value: "asTyped"
+              mode: dropdown
+          default: "inherit"
+        background_color:
+          name: Background Color
+          description: Select the Background color.
+          selector:
+            color_rgb:
+          default: [0, 0, 0]
+        text_color:
+          name: Text Color
+          description: Select the Text color.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        use_threshold:
+          name: Use Threshold value?
+          description: >-
+            If set to true, the color of your text adapts based on whether the value
+            of your sensor is below or above the threshold value.
+          selector:
+            boolean:
+          default: false
+        threshold_value:
+          name: Threshold Value
+          description: Enter a value that can be used as a threshold to switch colors.
+          default: "0"
+        low_value_text_color:
+          name: Low-value Text color
+          description: Color used when the sensor value is lower than the threshold value.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        high_value_text_color:
+          name: High-value Text color
+          description: Color used when the sensor value is equal to or higher than the threshold value.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_1:
+          name: Gradient 1
+          description: >-
+            First gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        gradient_2:
+          name: Gradient 2
+          description: >-
+            Second gradient color for the text. Ignored when both gradient colors are
+            the same.
+          selector:
+            color_rgb:
+          default: [255, 255, 255]
+        show_rainbow:
+          name: Rainbow Colors
+          description: >-
+            Should the text be shown in Rainbow colors? This overwrites the Gradient
+            setting.
+          selector:
+            boolean:
+          default: false
+    advanced_section:
+      name: Advanced options
+      icon: mdi:cog
+      collapsed: true
+      input:
+        repeat:
+          name: Repeat
+          description: >-
+            How many times the text is scrolled through the matrix before the app
+            ends. 0 turns it off and the duration is used instead.
+          default: "0"
+        duration:
+          name: Duration (in seconds)
+          description: Sets how long the app should be displayed. 0 is global app time.
+          default: "0"
+        lifetime:
+          name: Lifetime (in seconds)
+          description: >-
+            How long the app stays alive before it is removed from the app cycle
+            automatically. 0 is infinite lifetime.
+          default: "0"
+        lifetime_expiry:
+          name: On lifetime expiry
+          description: >-
+            What happens when the lifetime runs out. "Remove" drops the app from the
+            rotation, "Mark" keeps it and draws a dark red frame around it.
+          selector:
+            select:
+              options:
+                - label: "Remove the app"
+                  value: "remove"
+                - label: "Mark the app as stale"
+                  value: "mark"
+              mode: dropdown
+          default: "remove"
+        switch_to_app:
+          name: Switch to app on value change
+          description: >-
+            Should the clock switch to the app immediately when the sensor value
+            changes? BEWARE! Setting this to On for a sensor that changes very
+            frequently might flood your clock with MQTT messages.
+          selector:
+            boolean:
+          default: false
+        scroll:
+          name: Scroll the text?
+          description: Enables text scrolling.
+          selector:
+            boolean:
+          default: true
+        scrollspeed:
+          name: Scroll Speed Percentage
+          description: Modifies the scrollspeed. You need to enter a percentage value.
+          selector:
+            number:
+              mode: slider
+              min: 0
+              max: 200
+          default: 100
+        effect:
+          name: Effect
+          description: Select a background effect (optional).
+          selector:
+            select:
+              options:
+                - label: "None"
+                  value: ""
+                - label: "BrickBreaker"
+                  value: "BrickBreaker"
+                - label: "Checkerboard"
+                  value: "Checkerboard"
+                - label: "ColorWaves"
+                  value: "ColorWaves"
+                - label: "Fade"
+                  value: "Fade"
+                - label: "Fireworks"
+                  value: "Fireworks"
+                - label: "LookingEyes"
+                  value: "LookingEyes"
+                - label: "Matrix"
+                  value: "Matrix"
+                - label: "MovingLine"
+                  value: "MovingLine"
+                - label: "PingPong"
+                  value: "PingPong"
+                - label: "Pacifica"
+                  value: "Pacifica"
+                - label: "Plasma"
+                  value: "Plasma"
+                - label: "PlasmaCloud"
+                  value: "PlasmaCloud"
+                - label: "Radar"
+                  value: "Radar"
+                - label: "Ripple"
+                  value: "Ripple"
+                - label: "Snake"
+                  value: "Snake"
+                - label: "SwirlIn"
+                  value: "SwirlIn"
+                - label: "SwirlOut"
+                  value: "SwirlOut"
+                - label: "TheaterChase"
+                  value: "TheaterChase"
+                - label: "TwinklingStars"
+                  value: "TwinklingStars"
+              mode: dropdown
+          default: ""
+
+mode: queued
+max: 60
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+  - trigger: state
+    entity_id: !input my_sensor
+    id: Changes
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  my_sensor: !input my_sensor
+  my_template_sensor: !input my_template_sensor
+  my_icon: !input my_icon
+  icon_mode: !input icon_mode
+  text_case: !input text_case
+  background_color: !input background_color
+  base_text_color: !input text_color
+  use_threshold: !input use_threshold
+  threshold_value: !input threshold_value
+  low_value_text_color: !input low_value_text_color
+  high_value_text_color: !input high_value_text_color
+  gradient_1: !input gradient_1
+  gradient_2: !input gradient_2
+  show_rainbow: !input show_rainbow
+  my_repeat: !input repeat
+  my_duration: !input duration
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # AWTRIX NG app names must match [A-Za-z0-9_-]{1,32}, so the entity id is sanitised.
+  app_name: >-
+    {{ (my_sensor | trim | regex_replace('[^A-Za-z0-9_-]', '_'))[:32] }}
+  # NOTE: Home Assistant renders the template that was entered in "my_template_sensor"
+  # and then applies native-type parsing to the result, so a template like
+  # "{{ states('sensor.x') | round(1) }}" comes back as a NUMBER, not a string.
+  # Compare with "| string | trim" instead of == "" so a numeric result is handled,
+  # and cast the value to a string again in app_payload (see below).
+  my_text: >-
+    {{ states(my_sensor, rounded=True, with_unit=True)
+       if my_template_sensor | string | trim == ""
+       else my_template_sensor }}
+  my_value: >-
+    {{ states(my_sensor)
+       if my_template_sensor | string | trim == ""
+       else (my_template_sensor | string | select('in', '.-0123456789') | join) }}
+  text_color: >-
+    {% if use_threshold %}
+      {{ low_value_text_color if (my_value | float(0)) < (threshold_value | float(0)) else high_value_text_color }}
+    {% else %}
+      {{ base_text_color }}
+    {% endif %}
+  app_payload: >-
+    {% set use_palette = show_rainbow or (gradient_1 != gradient_2) %}
+    {# AWTRIX NG validates strictly and rejects the WHOLE payload when "text" is a
+       number instead of a string. Force a string, unless the template produced a
+       fragment array (a list), which AWTRIX NG accepts as-is. #}
+    {% set app_text = my_text
+                      if (my_text is sequence and my_text is not string and my_text is not mapping)
+                      else my_text | string %}
+    {{ {
+         "text": app_text,
+         "icon": my_icon | string,
+         "backgroundColor": background_color,
+         "textColor": "palette" if use_palette else text_color,
+         "palette": "Rainbow" if show_rainbow
+                    else ([gradient_1, gradient_2] if gradient_1 != gradient_2 else none),
+         "textCase": text_case,
+         "iconMode": icon_mode,
+         "repeat": my_repeat | int(0),
+         "durationMs": (my_duration | int(0)) * 1000,
+         "lifetimeMs": (my_lifetime | int(0)) * 1000,
+         "lifetimeExpiry": lifetime_expiry,
+         "scroll": {"mode": "static"} if not scrolling
+                   else {"speed": scroll_speed | int(100)},
+         "effect": effect
+       } | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                # An empty payload on cmd/apps/pushed/<name> deletes the app.
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: ""
+      - conditions:
+          - condition: and
+            conditions:
+              - condition: trigger
+                id: Changes
+              - condition: state
+                entity_id: !input toggle_helper
+                state: "on"
+              - condition: not
+                conditions:
+                  - condition: state
+                    entity_id: !input my_sensor
+                    state:
+                      - "off"
+                      - idle
+                      - unavailable
+                      - unknown
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - condition: template
+                  value_template: "{{ switch_to_app == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"

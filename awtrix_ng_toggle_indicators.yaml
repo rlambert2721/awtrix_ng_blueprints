@@ -1,0 +1,318 @@
+##########
+# AWTRIX NG - Toggle Indicators
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Toggle Indicators
+  description: >-
+    Toggles the three indicator pixels on the right edge of one or more AWTRIX NG
+    displays with toggle helpers, optionally blinking and with an alert sound. Built
+    for the AWTRIX NG MQTT API. V1.0
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/indicators/1..3.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper_indicator_1:
+      name: Right Top Indicator Toggle Helper
+      description: Select the Toggle Helper that will toggle the right top indicator.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+      default: "input_boolean.awtrix_display_indicator_1"
+    indicator_1_color:
+      name: Right Top Indicator color
+      description: Select the Right Top Indicator color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    indicator_1_blink_speed:
+      name: Blink Speed Top Indicator
+      description: Blink period in milliseconds. 0 = no blinking.
+      selector:
+        number:
+          min: 0
+          max: 5000
+      default: 0
+    indicator_1_play_alert_tone:
+      name: Play Alert Tone Right Top Indicator
+      description: Should an alert tone be played for the Right Top Indicator?
+      selector:
+        boolean:
+      default: false
+    toggle_helper_indicator_2:
+      name: Right Middle Indicator Toggle Helper
+      description: Select the Toggle Helper that will toggle the right middle indicator.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+      default: "input_boolean.awtrix_display_indicator_2"
+    indicator_2_color:
+      name: Right Middle Indicator color
+      description: Select the Right Middle Indicator color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    indicator_2_blink_speed:
+      name: Blink Speed Middle Indicator
+      description: Blink period in milliseconds. 0 = no blinking.
+      selector:
+        number:
+          min: 0
+          max: 5000
+      default: 0
+    indicator_2_play_alert_tone:
+      name: Play Alert Tone Right Middle Indicator
+      description: Should an alert tone be played for the Right Middle Indicator?
+      selector:
+        boolean:
+      default: false
+    toggle_helper_indicator_3:
+      name: Right Bottom Indicator Toggle Helper
+      description: Select the Toggle Helper that will toggle the right bottom indicator.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+      default: "input_boolean.awtrix_display_indicator_3"
+    indicator_3_color:
+      name: Right Bottom Indicator color
+      description: Select the Right Bottom Indicator color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    indicator_3_blink_speed:
+      name: Blink Speed Bottom Indicator
+      description: Blink period in milliseconds. 0 = no blinking.
+      selector:
+        number:
+          min: 0
+          max: 5000
+      default: 0
+    indicator_3_play_alert_tone:
+      name: Play Alert Tone Right Bottom Indicator
+      description: Should an alert tone be played for the Right Bottom Indicator?
+      selector:
+        boolean:
+      default: false
+    sound_section:
+      name: Alert sound
+      icon: mdi:music-note
+      collapsed: true
+      input:
+        sound_name:
+          name: Sound File / Track
+          description: >-
+            Buzzer: the name of a melody in /MELODIES (without .txt). DFPlayer: the
+            track number. Leave empty to play the RTTTL melody below instead.
+          selector:
+            text:
+          default: ""
+        sound_rtttl:
+          name: Alert Melody (RTTTL)
+          description: Melody played when no sound file is set above.
+          selector:
+            text:
+          default: "alert:d=4,o=5,b=180:8c6,8p,8c6,8p,8c6"
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_1
+    to: "on"
+    id: indicator 1 on
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_1
+    to: "off"
+    id: indicator 1 off
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_2
+    to: "on"
+    id: indicator 2 on
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_2
+    to: "off"
+    id: indicator 2 off
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_3
+    to: "on"
+    id: indicator 3 on
+  - trigger: state
+    entity_id: !input toggle_helper_indicator_3
+    to: "off"
+    id: indicator 3 off
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  indicator_1_color: !input indicator_1_color
+  indicator_2_color: !input indicator_2_color
+  indicator_3_color: !input indicator_3_color
+  indicator_1_blink_speed: !input indicator_1_blink_speed
+  indicator_2_blink_speed: !input indicator_2_blink_speed
+  indicator_3_blink_speed: !input indicator_3_blink_speed
+  indicator_1_alert: !input indicator_1_play_alert_tone
+  indicator_2_alert: !input indicator_2_play_alert_tone
+  indicator_3_alert: !input indicator_3_play_alert_tone
+  sound_name: !input sound_name
+  sound_rtttl: !input sound_rtttl
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # AWTRIX NG: "blink" became "blinkMs"; an indicator is switched off with color 0,
+  # which keeps the stored color so Home Assistant can republish it unchanged.
+  payload_1_on: >-
+    {{ {"color": indicator_1_color,
+        "blinkMs": indicator_1_blink_speed | int(0),
+        "fadeMs": 0} | tojson }}
+  payload_2_on: >-
+    {{ {"color": indicator_2_color,
+        "blinkMs": indicator_2_blink_speed | int(0),
+        "fadeMs": 0} | tojson }}
+  payload_3_on: >-
+    {{ {"color": indicator_3_color,
+        "blinkMs": indicator_3_blink_speed | int(0),
+        "fadeMs": 0} | tojson }}
+  payload_off: '{{ {"color": 0, "blinkMs": 0, "fadeMs": 0} | tojson }}'
+  # AWTRIX NG: exactly one of "name", "rtttl" or "builtin" may be sent.
+  sound_payload: >-
+    {{ ({"name": sound_name} if sound_name else {"rtttl": sound_rtttl}) | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: indicator 1 on
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/1' }}"
+                    payload: "{{ payload_1_on }}"
+                - condition: template
+                  value_template: "{{ indicator_1_alert == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/sounds/play' }}"
+                    payload: "{{ sound_payload }}"
+      - conditions:
+          - condition: trigger
+            id: indicator 1 off
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/1' }}"
+                    payload: "{{ payload_off }}"
+      - conditions:
+          - condition: trigger
+            id: indicator 2 on
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/2' }}"
+                    payload: "{{ payload_2_on }}"
+                - condition: template
+                  value_template: "{{ indicator_2_alert == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/sounds/play' }}"
+                    payload: "{{ sound_payload }}"
+      - conditions:
+          - condition: trigger
+            id: indicator 2 off
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/2' }}"
+                    payload: "{{ payload_off }}"
+      - conditions:
+          - condition: trigger
+            id: indicator 3 on
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/3' }}"
+                    payload: "{{ payload_3_on }}"
+                - condition: template
+                  value_template: "{{ indicator_3_alert == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/sounds/play' }}"
+                    payload: "{{ sound_payload }}"
+      - conditions:
+          - condition: trigger
+            id: indicator 3 off
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/indicators/3' }}"
+                    payload: "{{ payload_off }}"

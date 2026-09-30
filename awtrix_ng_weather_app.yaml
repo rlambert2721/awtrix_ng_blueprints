@@ -1,0 +1,593 @@
+##########
+# AWTRIX NG - Weather App
+#
+# (c) copyright 2026 by Smart Home Junkie. You may not copy, reproduce, distribute, transmit, modify, create derivative works,
+# or in any other way exploit any part of copyrighted material without the prior written permission from Smart Home Junkie
+##########
+
+blueprint:
+  name: AWTRIX NG Weather App
+  description: >-
+    Shows the current weather as a pushed app on one or more AWTRIX NG displays while
+    a toggle helper is on, and removes the app again when the toggle goes off. Built
+    for the AWTRIX NG MQTT API. V1.1
+  domain: automation
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG displays. Needs HA discovery enabled on each
+        device - the blueprint reads its MQTT prefix from the "MQTT prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home Assistant -
+        the mqttPrefix from their MQTT settings, or the 12-character device uid when
+        that field is empty. Commands go to <prefix>/cmd/apps/pushed/<app name>.
+      selector:
+        text:
+          multiple: true
+      default: []
+    toggle_helper:
+      name: Toggle Helper
+      description: Select the Toggle Helper that will toggle the App on or off.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    my_sensor:
+      name: Sensor
+      description: Select your Weather Sensor.
+      selector:
+        entity:
+          filter:
+            - domain: weather
+    show_text:
+      name: Show Weather Text
+      description: Should the weather condition be shown as text?
+      selector:
+        boolean:
+      default: true
+    language:
+      name: Language
+      description: Show the weather condition in this language.
+      selector:
+        select:
+          options:
+            - label: "English"
+              value: "en"
+            - label: "Danish"
+              value: "dk"
+            - label: "Dutch"
+              value: "nl"
+            - label: "French"
+              value: "fr"
+            - label: "German"
+              value: "de"
+            - label: "Italian"
+              value: "it"
+            - label: "Polish"
+              value: "pl"
+            - label: "Portuguese"
+              value: "pt"
+            - label: "Russian"
+              value: "ru"
+            - label: "Spanish"
+              value: "es"
+          mode: dropdown
+      default: "en"
+    show_temperature:
+      name: Show temperature
+      description: Should the temperature be shown?
+      selector:
+        boolean:
+      default: true
+    show_windspeed:
+      name: Show Wind Speed
+      description: Should the wind speed be shown?
+      selector:
+        boolean:
+      default: true
+    show_humidity:
+      name: Show Humidity
+      description: Should the humidity be shown?
+      selector:
+        boolean:
+      default: true
+    icon_mode:
+      name: Push Icon
+      description: Icon behavior.
+      selector:
+        select:
+          options:
+            - label: "Icon doesn't move"
+              value: "fixed"
+            - label: "Icon moves with text and will not appear again"
+              value: "pushOnce"
+            - label: "Icon moves with text but appears again when the text starts"
+              value: "push"
+          mode: dropdown
+      default: "push"
+    overlay:
+      name: Weather Overlay
+      description: >-
+        Optional AWTRIX NG weather overlay drawn on top of the app. "Follow device
+        setting" leaves the global overlay in charge.
+      selector:
+        select:
+          options:
+            - label: "Follow device setting"
+              value: ""
+            - label: "Drizzle"
+              value: "drizzle"
+            - label: "Frost"
+              value: "frost"
+            - label: "Rain"
+              value: "rain"
+            - label: "Snow"
+              value: "snow"
+            - label: "Storm"
+              value: "storm"
+            - label: "Thunder"
+              value: "thunder"
+          mode: dropdown
+      default: ""
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+            - label: "Use global setting"
+              value: "inherit"
+            - label: "Force Uppercase"
+              value: "upper"
+            - label: "Show as you entered it"
+              value: "asTyped"
+          mode: dropdown
+      default: "inherit"
+    background_color:
+      name: Background Color
+      description: Select the Background color.
+      selector:
+        color_rgb:
+      default: [0, 0, 0]
+    text_color:
+      name: Text Color
+      description: Select the Text color.
+      selector:
+        color_rgb:
+      default: [255, 255, 255]
+    show_rainbow:
+      name: Rainbow Colors
+      description: Should the text be shown in Rainbow colors?
+      selector:
+        boolean:
+      default: false
+    repeat:
+      name: Repeat
+      description: >-
+        How many times the text is scrolled through the matrix before the app ends.
+        0 turns it off and the duration is used instead.
+      default: "0"
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      default: "0"
+    lifetime:
+      name: Lifetime (in seconds)
+      description: >-
+        How long the app stays alive before it is removed from the app cycle
+        automatically. 0 is infinite lifetime.
+      default: "0"
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: >-
+        What happens when the lifetime runs out. "Remove" drops the app from the
+        rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+            - label: "Remove the app"
+              value: "remove"
+            - label: "Mark the app as stale"
+              value: "mark"
+          mode: dropdown
+      default: "remove"
+    switch_to_app:
+      name: Switch to app on value change
+      description: Should the clock switch to the app immediately when the weather changes?
+      selector:
+        boolean:
+      default: false
+    scroll:
+      name: Scroll the text?
+      description: Enables text scrolling.
+      selector:
+        boolean:
+      default: true
+    scrollspeed:
+      name: Scroll Speed Percentage
+      description: Modifies the scrollspeed. You need to enter a percentage value.
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 200
+      default: 100
+    effect:
+      name: Effect
+      description: Select a background effect (optional).
+      selector:
+        select:
+          options:
+            - label: "None"
+              value: ""
+            - label: "BrickBreaker"
+              value: "BrickBreaker"
+            - label: "Checkerboard"
+              value: "Checkerboard"
+            - label: "ColorWaves"
+              value: "ColorWaves"
+            - label: "Fade"
+              value: "Fade"
+            - label: "Fireworks"
+              value: "Fireworks"
+            - label: "LookingEyes"
+              value: "LookingEyes"
+            - label: "Matrix"
+              value: "Matrix"
+            - label: "MovingLine"
+              value: "MovingLine"
+            - label: "PingPong"
+              value: "PingPong"
+            - label: "Pacifica"
+              value: "Pacifica"
+            - label: "Plasma"
+              value: "Plasma"
+            - label: "PlasmaCloud"
+              value: "PlasmaCloud"
+            - label: "Radar"
+              value: "Radar"
+            - label: "Ripple"
+              value: "Ripple"
+            - label: "Snake"
+              value: "Snake"
+            - label: "SwirlIn"
+              value: "SwirlIn"
+            - label: "SwirlOut"
+              value: "SwirlOut"
+            - label: "TheaterChase"
+              value: "TheaterChase"
+            - label: "TwinklingStars"
+              value: "TwinklingStars"
+          mode: dropdown
+      default: ""
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "on"
+    id: "On"
+  - trigger: state
+    entity_id: !input toggle_helper
+    to: "off"
+    id: "Off"
+  - trigger: state
+    entity_id: !input my_sensor
+    id: Changes
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  my_sensor: !input my_sensor
+  icon_mode: !input icon_mode
+  overlay: !input overlay
+  text_case: !input text_case
+  show_rainbow: !input show_rainbow
+  background_color: !input background_color
+  text_color: !input text_color
+  my_repeat: !input repeat
+  my_duration: !input duration
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  show_text: !input show_text
+  language: !input language
+  show_temperature: !input show_temperature
+  show_windspeed: !input show_windspeed
+  show_humidity: !input show_humidity
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  # AWTRIX NG app names must match [A-Za-z0-9_-]{1,32}, so the entity id is sanitised.
+  app_name: >-
+    {{ (my_sensor | trim | regex_replace('[^A-Za-z0-9_-]', '_'))[:32] }}
+  danish: >
+    {%- set translation = {
+                      'clear-night':'klar nat',
+                      'cloudy':'skyet',
+                      'fog':'tåge',
+                      'hail':'hagl',
+                      'lightning':'lyn',
+                      'partlycloudy':'delvis skyet',
+                      'pouring':'styrtende regn',
+                      'rainy':'regnfuld',
+                      'snowy-rainy':'slud',
+                      'snowy':'sne',
+                      'sunny':'sol',
+                      'windy':'blæst'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  dutch: >
+    {%- set translation = {
+                      'clear-night':'helder',
+                      'cloudy':'bewolkt',
+                      'fog':'mist',
+                      'hail':'hagel',
+                      'lightning':'bliksem',
+                      'partlycloudy':'halfbewolkt',
+                      'pouring':'regen',
+                      'rainy':'regenachtig',
+                      'snowy-rainy':'sneeuw/regen',
+                      'snowy':'sneeuw',
+                      'sunny':'zonnig',
+                      'windy':'wind'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  german: >
+    {%- set translation = {
+                      'clear-night':'klare nacht',
+                      'cloudy':'wolkig',
+                      'fog':'nebel',
+                      'hail':'hagel',
+                      'lightning':'blitz',
+                      'partlycloudy':'teilweise wolkig',
+                      'pouring':'gießen',
+                      'rainy':'regnerisch',
+                      'snowy-rainy':'verschneit-regnerisch',
+                      'snowy':'schnee',
+                      'sunny':'sonnig',
+                      'windy':'windig'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  french: >
+    {%- set translation = {
+                      'clear-night':'nuit claire',
+                      'cloudy':'nuageux',
+                      'fog':'brouillard',
+                      'hail':'grêle',
+                      'lightning':'foudre',
+                      'partlycloudy':'partiellement nuageux',
+                      'pouring':'verser',
+                      'rainy':'pluvieux',
+                      'snowy-rainy':'neigeux et pluvieux',
+                      'snowy':'neigeux',
+                      'sunny':'ensoleillé',
+                      'windy':'venteux'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  spanish: >
+    {%- set translation = {
+                      'clear-night':'noche clara',
+                      'cloudy':'nublado',
+                      'fog':'niebla',
+                      'hail':'granizo',
+                      'lightning':'truenos',
+                      'partlycloudy':'parcialmente nublado',
+                      'pouring':'torrencial',
+                      'rainy':'lluvioso',
+                      'snowy-rainy':'nevado-lluvioso',
+                      'snowy':'nevado',
+                      'sunny':'soleado',
+                      'windy':'ventoso'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  portugese: >
+    {%- set translation = {
+                      'clear-night':'noite clara',
+                      'cloudy':'nublado',
+                      'fog':'névoa',
+                      'hail':'saudação',
+                      'lightning':'raio',
+                      'partlycloudy':'parcialmente nublado',
+                      'pouring':'derramando',
+                      'rainy':'chuvoso',
+                      'snowy-rainy':'nevado-chuvoso',
+                      'snowy':'Nevado',
+                      'sunny':'ensolarado',
+                      'windy':'ventoso'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  polish: >
+    {%- set translation = {
+                      'clear-night':'Bezchmurna noc',
+                      'cloudy':'Pochmurno',
+                      'fog':'Mgla',
+                      'hail':'Grad',
+                      'lightning':'Burza',
+                      'partlycloudy':'Czesciowe zachmurzenie',
+                      'pouring':'Ulewa',
+                      'rainy':'Deszczowo',
+                      'snowy-rainy':'Deszcz ze sniegiem',
+                      'snowy':'Snieg',
+                      'sunny':'Slonecznie',
+                      'windy':'Wietrznie'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  italian: >
+    {%- set translation = {
+                      'clear-night':'Notte limpida',
+                      'cloudy':'Nuvoloso',
+                      'fog':'Nebbia',
+                      'hail':'Salve',
+                      'lightning':'Fulmine',
+                      'partlycloudy':'Parzialmente nuvoloso',
+                      'pouring':'Versare',
+                      'rainy':'Piovoso',
+                      'snowy-rainy':'Nevoso piovoso',
+                      'snowy':'Nevoso',
+                      'sunny':'Soleggiato',
+                      'windy':'Ventoso'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  russian: >
+    {%- set translation = {
+                      'clear-night':'Ясно',
+                      'cloudy':'Облачно',
+                      'fog':'Туман',
+                      'hail':'Град',
+                      'lightning':'Гроза',
+                      'partlycloudy':'Переменная облачность',
+                      'pouring':'Ливень',
+                      'rainy':'Дождь',
+                      'snowy-rainy':'Снег с дождем',
+                      'snowy':'Снег',
+                      'sunny':'Солнечно',
+                      'windy':'Ветрено'
+                      } -%}
+    {{ translation.get(states(my_sensor), states(my_sensor)) }}
+  my_text: >-
+    {%- if show_text -%}
+      {%- if language == 'en' -%}
+        {{ states(my_sensor) }}
+      {%- elif language == 'dk' -%}
+        {{ danish | trim }}
+      {%- elif language == 'nl' -%}
+        {{ dutch | trim }}
+      {%- elif language == 'de' -%}
+        {{ german | trim }}
+      {%- elif language == 'fr' -%}
+        {{ french | trim }}
+      {%- elif language == 'es' -%}
+        {{ spanish | trim }}
+      {%- elif language == 'pt' -%}
+        {{ portugese | trim }}
+      {%- elif language == 'pl' -%}
+        {{ polish | trim }}
+      {%- elif language == 'ru' -%}
+        {{ russian | trim }}
+      {%- elif language == 'it' -%}
+        {{ italian | trim }}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if show_temperature -%}
+      {{ ' ' }}{{ state_attr(my_sensor, 'temperature') }}{{ state_attr(my_sensor, 'temperature_unit') }}
+    {%- endif -%}
+    {%- if show_windspeed -%}
+      {{ ' - ' }}{{ state_attr(my_sensor, 'wind_speed') }}{{ state_attr(my_sensor, 'wind_speed_unit') }}
+    {%- endif -%}
+    {%- if show_humidity -%}
+      {{ ' - ' }}{{ state_attr(my_sensor, 'humidity') }}%
+    {%- endif -%}
+  app_payload: >-
+    {# my_text is rendered as a variable, so Home Assistant applies native-type parsing to
+       it - showing only the temperature can turn it into a NUMBER. AWTRIX NG rejects the
+       whole payload when "text" is not a string, leaving a blank display. #}
+    {{ {
+         "text": my_text | string,
+         "icon": states(my_sensor),
+         "backgroundColor": background_color,
+         "textColor": "palette" if show_rainbow else text_color,
+         "palette": "Rainbow" if show_rainbow else none,
+         "textCase": text_case,
+         "iconMode": icon_mode,
+         "overlay": overlay,
+         "repeat": my_repeat | int(0),
+         "durationMs": (my_duration | int(0)) * 1000,
+         "lifetimeMs": (my_lifetime | int(0)) * 1000,
+         "lifetimeExpiry": lifetime_expiry,
+         "scroll": {"mode": "static"} if not scrolling
+                   else {"speed": scroll_speed | int(100)},
+         "effect": effect
+       } | tojson }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "On"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
+      - conditions:
+          - condition: trigger
+            id: "Off"
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                # An empty payload on cmd/apps/pushed/<name> deletes the app.
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: ""
+      - conditions:
+          - condition: and
+            conditions:
+              - condition: trigger
+                id: Changes
+              - condition: state
+                entity_id: !input toggle_helper
+                state: "on"
+              - condition: not
+                conditions:
+                  - condition: state
+                    entity_id: !input my_sensor
+                    state:
+                      - unavailable
+                      - unknown
+        sequence:
+          - repeat:
+              for_each: "{{ targets }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}"
+                    payload: "{{ app_payload }}"
+                - condition: template
+                  value_template: "{{ switch_to_app == true }}"
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: "{{ app_name }}"
